@@ -24,14 +24,16 @@ var _ = fmt.Fprint
 
 func main() {
 	// Print the shell prompt
-	fmt.Fprint(os.Stdout, "$ ")
-
-	// Wait for user input
-	command, err := bufio.NewReader(os.Stdin).ReadString('\n')
-	if err != nil {
-		panic(err)
+	for {
+		fmt.Fprint(os.Stdout, "$ ")
+		command, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if err != nil {
+			panic(err)
+		}
+		// if command is empty, break
+		if strings.TrimSpace(command) == "" {
+			break
+		}
+		fmt.Fprintf(os.Stdout, "%s: command not found\n", strings.TrimSpace(command))
 	}
-
-	// Print the error message
-	fmt.Fprintf(os.Stdout, "%s: command not found\n", strings.TrimSpace(command))
 }
