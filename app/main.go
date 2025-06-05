@@ -37,13 +37,35 @@ func handleEcho(words []string) {
 	}
 }
 
+func commandFoundInPath(command string, path string) bool {
+	// Check if the command exists in the given path
+	fullPath := fmt.Sprintf("%s/%s", path, command)
+	if _, err := os.Stat(fullPath); err == nil {
+		return true
+	} else {
+		return false
+	}
+}
+
 // Handle the "type" command
 func handleType(words []string) {
 	if len(words) == 2 {
-		if validCommands[words[1]] {
-			fmt.Fprintf(os.Stdout, "%s is a shell builtin\n", words[1])
+		var path = os.Getenv("PATH")
+		var validCommand bool = false
+		var dirFound string = ""
+
+		for _, dir := range strings.Split(path, ":") {
+			if commandFoundInPath(words[1], dir) {
+				validCommand = true
+				dirFound = dir
+				break
+			}
+		}
+
+		if validCommand {
+			fmt.Fprintf(os.Stdout, "%s is %s/%s\n", words[1], dirFound, words[1])
 		} else {
-			fmt.Fprintf(os.Stdout, "%s: not found\n", words[1])
+			fmt.Fprintf(os.Stdout, "%s: command not found\n", words[1])
 		}
 	}
 }
