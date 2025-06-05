@@ -107,7 +107,7 @@ func processCommand(command string) bool {
 		output, _ = exec.Command(words[0]).Output()
 	}
 
-	fmt.Println(string(output))
+	fmt.Println(strings.TrimSpace(string(output)))
 	return false
 }
 
