@@ -13,17 +13,11 @@ import (
 var builtIns = []string{"echo", "type", "exit", "pwd", "cd"}
 var currentWorkingDir string
 
+// Helpers
+
 // Print the shell prompt
 func printPrompt() {
 	fmt.Fprint(os.Stdout, "$ ")
-}
-
-func isShellBuiltin(command string) bool {
-	// Check if the command is a shell builtin
-	if slices.Contains(builtIns, command) {
-		return true
-	}
-	return false
 }
 
 // Read user input from stdin
@@ -35,16 +29,7 @@ func readCommand() (string, error) {
 	return strings.TrimSpace(command), nil
 }
 
-// Handle the "echo" command
-func handleEcho(words []string) {
-	if len(words) > 1 {
-		fmt.Fprintln(os.Stdout, strings.Join(words[1:], " "))
-	} else {
-		fmt.Fprintln(os.Stdout, "")
-	}
-}
-
-func commandFoundInPath(fullPath string, path string) bool {
+func isValidPath(fullPath string) bool {
 	// Check if the command exists in the given path
 	if _, err := os.Stat(fullPath); err == nil {
 		return true
@@ -57,11 +42,28 @@ func findExecutablePath(command string, paths []string) (string, bool) {
 	// Check if the command exists in the given paths
 	for _, dir := range paths {
 		fullPath := fmt.Sprintf("%s/%s", dir, command)
-		if commandFoundInPath(fullPath, dir) {
+		if isValidPath(fullPath) {
 			return fullPath, true
 		}
 	}
 	return "", false
+}
+
+func isShellBuiltin(command string) bool {
+	// Check if the command is a shell builtin
+	if slices.Contains(builtIns, command) {
+		return true
+	}
+	return false
+}
+
+// Handle the "echo" command
+func handleEcho(words []string) {
+	if len(words) > 1 {
+		fmt.Fprintln(os.Stdout, strings.Join(words[1:], " "))
+	} else {
+		fmt.Fprintln(os.Stdout, "")
+	}
 }
 
 // Handle the "type" command
@@ -81,8 +83,17 @@ func handleType(words []string, paths []string) {
 		}
 	}
 }
+
 func handlePwd() {
 	fmt.Fprintln(os.Stdout, currentWorkingDir)
+}
+
+func handleCd(absolutePath string) {
+	if isValidPath(absolutePath) {
+		currentWorkingDir = absolutePath
+	} else {
+		fmt.Fprintf(os.Stderr, "cd: %s: No such file or directory\n", absolutePath)
+	}
 }
 
 // Process the command entered by the user
@@ -112,7 +123,7 @@ func processCommand(input string, paths []string) bool {
 		handlePwd()
 		return false
 	case "cd":
-		currentWorkingDir = args[0] //only absolute paths are supported
+		handleCd(args[0]) //only absolute paths are supported
 		return false
 
 	default:
