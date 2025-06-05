@@ -100,13 +100,18 @@ func processCommand(command string) bool {
 	}
 
 	var output []byte
+	var err error
 	// Handle unknown commands
 	if len(words) > 1 {
-		output, _ = exec.Command(words[0], strings.Join(words[1:], " ")).Output()
+		output, err = exec.Command(words[0], strings.Join(words[1:], " ")).Output()
 	} else {
-		output, _ = exec.Command(words[0]).Output()
+		output, err = exec.Command(words[0]).Output()
 	}
 
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "%s: command not found\n", words[0])
+		return false
+	}
 	fmt.Println(strings.TrimSpace(string(output)))
 	return false
 }
