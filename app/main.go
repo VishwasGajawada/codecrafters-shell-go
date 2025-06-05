@@ -11,7 +11,6 @@ import (
 
 // Globals
 var builtIns = []string{"echo", "type", "exit", "pwd", "cd"}
-var currentWorkingDir string
 
 // Helpers
 
@@ -41,11 +40,14 @@ func isValidPath(fullPath string) bool {
 func getAbsolutePath(path string) string {
 	if path == "" {
 		return path
+	} else if path == "~" {
+		homeDir := os.Getenv("HOME")
+		return homeDir
 	} else if path[0] == '/' {
 		return path
 	} else {
 		directory_changes := strings.Split(path, "/")
-		curDirectories := strings.Split(currentWorkingDir, "/")
+		curDirectories := strings.Split(handlePwd(), "/")
 
 		for _, change := range directory_changes {
 			if change == ".." {
@@ -113,14 +115,16 @@ func handleType(words []string, paths []string) {
 	}
 }
 
-func handlePwd() {
-	fmt.Fprintln(os.Stdout, currentWorkingDir)
+func handlePwd() string {
+	cwd, _ := os.Getwd()
+	fmt.Fprintln(os.Stdout, cwd)
+	return cwd
 }
 
 func handleCd(path string) {
 	absolutePath := getAbsolutePath(path)
 	if isValidPath(absolutePath) {
-		currentWorkingDir = absolutePath
+		os.Chdir(absolutePath)
 	} else {
 		fmt.Fprintf(os.Stderr, "cd: %s: No such file or directory\n", absolutePath)
 	}
@@ -176,7 +180,6 @@ func processCommand(input string, paths []string) bool {
 }
 
 func main() {
-	currentWorkingDir, _ = os.Getwd()
 	var path = os.Getenv("PATH")
 	var paths []string = strings.Split(path, ":")
 	for {
