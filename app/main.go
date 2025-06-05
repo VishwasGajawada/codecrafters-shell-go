@@ -9,12 +9,14 @@ import (
 	"strings"
 )
 
+// Globals
+var builtIns = []string{"echo", "type", "exit", "pwd", "cd"}
+var currentWorkingDir string
+
 // Print the shell prompt
 func printPrompt() {
 	fmt.Fprint(os.Stdout, "$ ")
 }
-
-var builtIns = []string{"echo", "type", "exit", "pwd"}
 
 func isShellBuiltin(command string) bool {
 	// Check if the command is a shell builtin
@@ -80,12 +82,7 @@ func handleType(words []string, paths []string) {
 	}
 }
 func handlePwd() {
-	currDir, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
-		return
-	}
-	fmt.Fprintln(os.Stdout, currDir)
+	fmt.Fprintln(os.Stdout, currentWorkingDir)
 }
 
 // Process the command entered by the user
@@ -114,6 +111,10 @@ func processCommand(input string, paths []string) bool {
 		// Handle "pwd" command
 		handlePwd()
 		return false
+	case "cd":
+		currentWorkingDir = args[0] //only absolute paths are supported
+		return false
+
 	default:
 		_, found := findExecutablePath(words[0], paths)
 		if !found {
@@ -131,6 +132,7 @@ func processCommand(input string, paths []string) bool {
 }
 
 func main() {
+	currentWorkingDir, _ = os.Getwd()
 	var path = os.Getenv("PATH")
 	var paths []string = strings.Split(path, ":")
 	for {
