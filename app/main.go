@@ -65,7 +65,7 @@ func handleType(words []string) {
 		if validCommand {
 			fmt.Fprintf(os.Stdout, "%s is %s/%s\n", words[1], dirFound, words[1])
 		} else {
-			fmt.Fprintf(os.Stdout, "%s: command not found\n", words[1])
+			fmt.Fprintf(os.Stdout, "%s: not found\n", words[1])
 		}
 	}
 }
