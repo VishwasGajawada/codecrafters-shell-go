@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"slices"
 	"strings"
 )
@@ -98,12 +99,20 @@ func processCommand(command string) bool {
 		return false
 	}
 
+	var output []byte
 	// Handle unknown commands
-	fmt.Fprintf(os.Stdout, "%s: command not found\n", words[0])
+	if len(words) > 1 {
+		output, _ = exec.Command(words[0], strings.Join(words[1:], " ")).Output()
+	} else {
+		output, _ = exec.Command(words[0]).Output()
+	}
+
+	fmt.Println(string(output))
 	return false
 }
 
 func main() {
+
 	for {
 		printPrompt()
 
