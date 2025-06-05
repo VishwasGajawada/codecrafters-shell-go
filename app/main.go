@@ -47,7 +47,8 @@ func getAbsolutePath(path string) string {
 		return path
 	} else {
 		directory_changes := strings.Split(path, "/")
-		curDirectories := strings.Split(handlePwd(), "/")
+		cwd, _ := os.Getwd()
+		curDirectories := strings.Split(cwd, "/")
 
 		for _, change := range directory_changes {
 			if change == ".." {
