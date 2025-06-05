@@ -14,7 +14,7 @@ func printPrompt() {
 	fmt.Fprint(os.Stdout, "$ ")
 }
 
-var builtIns = []string{"echo", "type", "exit"}
+var builtIns = []string{"echo", "type", "exit", "pwd"}
 
 func isShellBuiltin(command string) bool {
 	// Check if the command is a shell builtin
@@ -79,43 +79,53 @@ func handleType(words []string, paths []string) {
 		}
 	}
 }
+func handlePwd() {
+	currDir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
+		return
+	}
+	fmt.Fprintln(os.Stdout, currDir)
+}
 
 // Process the command entered by the user
-func processCommand(command string, paths []string) bool {
+func processCommand(input string, paths []string) bool {
 	// Split the command into words
-	words := strings.Fields(command)
+	words := strings.Fields(input)
 
 	// Handle empty input
 	if len(words) == 0 {
 		return false
 	}
 
-	// Handle "exit" command
-	if words[0] == "exit" {
-		return true
-	}
+	command := words[0]
+	args := words[1:]
 
-	// Handle "echo" command
-	if words[0] == "echo" {
+	switch command {
+	case "exit":
+		return true // Exit the shell
+	case "echo":
 		handleEcho(words)
-		return false
-	}
-
-	// Handle "type" command
-	if words[0] == "type" {
+		return false // Continue the shell
+	case "type":
 		handleType(words, paths)
+		return false // Continue the shell
+	case "pwd":
+		// Handle "pwd" command
+		handlePwd()
 		return false
-	}
-
-	_, found := findExecutablePath(words[0], paths)
-	if !found {
-		fmt.Fprintf(os.Stderr, "%s: command not found\n", words[0])
+	default:
+		_, found := findExecutablePath(words[0], paths)
+		if !found {
+			fmt.Fprintf(os.Stderr, "%s: command not found\n", words[0])
+			return false
+		} else {
+			var cmd = exec.Command(words[0], args...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Run()
+		}
 		return false
-	} else {
-		var cmd = exec.Command(words[0], words[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Run()
 	}
 	return false
 }
