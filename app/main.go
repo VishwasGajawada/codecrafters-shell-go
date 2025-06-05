@@ -34,6 +34,11 @@ func main() {
 		if strings.TrimSpace(command) == "" {
 			break
 		}
+		// split the command by spaces into array of words
+		words := strings.Fields(command)
+		if words[0] == "exit" {
+			return
+		}
 		fmt.Fprintf(os.Stdout, "%s: command not found\n", strings.TrimSpace(command))
 	}
 }
