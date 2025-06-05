@@ -38,6 +38,35 @@ func isValidPath(fullPath string) bool {
 	}
 }
 
+func getAbsolutePath(path string) string {
+	if path == "" {
+		return path
+	} else if path[0] == '/' {
+		return path
+	} else {
+		directory_changes := strings.Split(path, "/")
+		curDirectories := strings.Split(currentWorkingDir, "/")
+
+		for _, change := range directory_changes {
+			if change == ".." {
+				// Pop the last directory if not at the root
+				if len(curDirectories) > 0 {
+					curDirectories = curDirectories[:len(curDirectories)-1]
+				}
+			} else if change != "." && change != "" {
+				// Push the directory to the current path
+				curDirectories = append(curDirectories, change)
+			}
+		}
+		// Join the directories back into a single path
+		absolutePath := strings.Join(curDirectories, "/")
+		if !strings.HasPrefix(absolutePath, "/") {
+			absolutePath = "/" + absolutePath
+		}
+		return absolutePath
+	}
+}
+
 func findExecutablePath(command string, paths []string) (string, bool) {
 	// Check if the command exists in the given paths
 	for _, dir := range paths {
@@ -88,7 +117,8 @@ func handlePwd() {
 	fmt.Fprintln(os.Stdout, currentWorkingDir)
 }
 
-func handleCd(absolutePath string) {
+func handleCd(path string) {
+	absolutePath := getAbsolutePath(path)
 	if isValidPath(absolutePath) {
 		currentWorkingDir = absolutePath
 	} else {
@@ -123,6 +153,10 @@ func processCommand(input string, paths []string) bool {
 		handlePwd()
 		return false
 	case "cd":
+		if args == nil || len(args) != 1 {
+			fmt.Fprintln(os.Stderr, "cd: missing argument")
+			return false
+		}
 		handleCd(args[0]) //only absolute paths are supported
 		return false
 
@@ -139,7 +173,6 @@ func processCommand(input string, paths []string) bool {
 		}
 		return false
 	}
-	return false
 }
 
 func main() {
