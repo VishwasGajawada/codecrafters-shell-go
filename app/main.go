@@ -16,6 +16,14 @@ func printPrompt() {
 
 var builtIns = []string{"echo", "type", "exit"}
 
+func isShellBuiltin(command string) bool {
+	// Check if the command is a shell builtin
+	if slices.Contains(builtIns, command) {
+		return true
+	}
+	return false
+}
+
 // Read user input from stdin
 func readCommand() (string, error) {
 	command, err := bufio.NewReader(os.Stdin).ReadString('\n')
@@ -34,9 +42,8 @@ func handleEcho(words []string) {
 	}
 }
 
-func commandFoundInPath(command string, path string) bool {
+func commandFoundInPath(fullPath string, path string) bool {
 	// Check if the command exists in the given path
-	fullPath := fmt.Sprintf("%s/%s", path, command)
 	if _, err := os.Stat(fullPath); err == nil {
 		return true
 	} else {
@@ -44,28 +51,29 @@ func commandFoundInPath(command string, path string) bool {
 	}
 }
 
-// Handle the "type" command
-func handleType(words []string) {
-	if len(words) == 2 {
-		var path = os.Getenv("PATH")
-		var validCommand bool = false
-		var dirFound string = ""
+func findExecutablePath(command string, paths []string) (string, bool) {
+	// Check if the command exists in the given paths
+	for _, dir := range paths {
+		fullPath := fmt.Sprintf("%s/%s", dir, command)
+		if commandFoundInPath(fullPath, dir) {
+			return fullPath, true
+		}
+	}
+	return "", false
+}
 
-		if slices.Contains(builtIns, words[1]) {
+// Handle the "type" command
+func handleType(words []string, paths []string) {
+	if len(words) == 2 {
+		if isShellBuiltin(words[1]) {
 			fmt.Fprintf(os.Stdout, "%s is a shell builtin\n", words[1])
 			return
 		}
 
-		for _, dir := range strings.Split(path, ":") {
-			if commandFoundInPath(words[1], dir) {
-				validCommand = true
-				dirFound = dir
-				break
-			}
-		}
+		filePath, found := findExecutablePath(words[1], paths)
 
-		if validCommand {
-			fmt.Fprintf(os.Stdout, "%s is %s/%s\n", words[1], dirFound, words[1])
+		if found {
+			fmt.Fprintf(os.Stdout, "%s is %s\n", words[1], filePath)
 		} else {
 			fmt.Fprintf(os.Stdout, "%s: not found\n", words[1])
 		}
@@ -73,7 +81,7 @@ func handleType(words []string) {
 }
 
 // Process the command entered by the user
-func processCommand(command string) bool {
+func processCommand(command string, paths []string) bool {
 	// Split the command into words
 	words := strings.Fields(command)
 
@@ -95,29 +103,26 @@ func processCommand(command string) bool {
 
 	// Handle "type" command
 	if words[0] == "type" {
-		handleType(words)
+		handleType(words, paths)
 		return false
 	}
 
-	var output []byte
-	var err error
-	// Handle unknown commands
-	if len(words) > 1 {
-		output, err = exec.Command(words[0], strings.Join(words[1:], " ")).Output()
+	_, found := findExecutablePath(words[0], paths)
+	if !found {
+		fmt.Fprintf(os.Stderr, "%s: command not found\n", words[0])
+		return false
 	} else {
-		output, err = exec.Command(words[0]).Output()
+		var cmd = exec.Command(words[0], words[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Run()
 	}
-
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s: command not found\n", words[0])
-		return false
-	}
-	fmt.Println(strings.TrimSpace(string(output)))
 	return false
 }
 
 func main() {
-
+	var path = os.Getenv("PATH")
+	var paths []string = strings.Split(path, ":")
 	for {
 		printPrompt()
 
@@ -129,7 +134,7 @@ func main() {
 		}
 
 		// Process the command
-		if processCommand(command) {
+		if processCommand(command, paths) {
 			break
 		}
 	}
