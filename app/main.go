@@ -7,36 +7,93 @@ import (
 	"strings"
 )
 
-// Ensures gofmt doesn't remove the "fmt" import in stage 1 (feel free to remove this!)
-var _ = fmt.Fprint
+// Print the shell prompt
+func printPrompt() {
+	fmt.Fprint(os.Stdout, "$ ")
+}
+
+// set of commands that the shell can handle
+var validCommands = map[string]bool{
+	"echo": true,
+	"type": true,
+	"exit": true,
+}
+
+// Read user input from stdin
+func readCommand() (string, error) {
+	command, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(command), nil
+}
+
+// Handle the "echo" command
+func handleEcho(words []string) {
+	if len(words) > 1 {
+		fmt.Fprintln(os.Stdout, strings.Join(words[1:], " "))
+	} else {
+		fmt.Fprintln(os.Stdout, "")
+	}
+}
+
+// Handle the "type" command
+func handleType(words []string) {
+	if len(words) == 2 {
+		if validCommands[words[1]] {
+			fmt.Fprintf(os.Stdout, "%s is a shell builtin\n", words[1])
+		} else {
+			fmt.Fprintf(os.Stdout, "%s: not found\n", words[1])
+		}
+	}
+}
+
+// Process the command entered by the user
+func processCommand(command string) bool {
+	// Split the command into words
+	words := strings.Fields(command)
+
+	// Handle empty input
+	if len(words) == 0 {
+		return false
+	}
+
+	// Handle "exit" command
+	if words[0] == "exit" {
+		return true
+	}
+
+	// Handle "echo" command
+	if words[0] == "echo" {
+		handleEcho(words)
+		return false
+	}
+
+	// Handle "type" command
+	if words[0] == "type" {
+		handleType(words)
+		return false
+	}
+
+	// Handle unknown commands
+	fmt.Fprintf(os.Stdout, "%s: command not found\n", words[0])
+	return false
+}
 
 func main() {
-	// Print the shell prompt
 	for {
-		fmt.Fprint(os.Stdout, "$ ")
-		command, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		printPrompt()
+
+		// Read the command
+		command, err := readCommand()
 		if err != nil {
-			panic(err)
-		}
-		// if command is empty, break
-		if strings.TrimSpace(command) == "" {
+			fmt.Fprintf(os.Stderr, "Error reading command: %v\n", err)
 			break
 		}
-		// split the command by spaces into array of words
-		words := strings.Fields(command)
-		if words[0] == "exit" {
-			return
-		}
 
-		if words[0] == "echo" {
-			// Print the rest of the command
-			if len(words) > 1 {
-				fmt.Fprintln(os.Stdout, strings.Join(words[1:], " "))
-			} else {
-				fmt.Fprintln(os.Stdout, "")
-			}
-			continue
+		// Process the command
+		if processCommand(command) {
+			break
 		}
-		fmt.Fprintf(os.Stdout, "%s: command not found\n", strings.TrimSpace(command))
 	}
 }
