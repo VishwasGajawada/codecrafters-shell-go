@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -12,12 +13,7 @@ func printPrompt() {
 	fmt.Fprint(os.Stdout, "$ ")
 }
 
-// set of commands that the shell can handle
-var validCommands = map[string]bool{
-	"echo": true,
-	"type": true,
-	"exit": true,
-}
+var builtIns = []string{"echo", "type", "exit"}
 
 // Read user input from stdin
 func readCommand() (string, error) {
@@ -53,6 +49,11 @@ func handleType(words []string) {
 		var path = os.Getenv("PATH")
 		var validCommand bool = false
 		var dirFound string = ""
+
+		if slices.Contains(builtIns, words[1]) {
+			fmt.Fprintf(os.Stdout, "%s is a shell builtin\n", words[1])
+			return
+		}
 
 		for _, dir := range strings.Split(path, ":") {
 			if commandFoundInPath(words[1], dir) {
