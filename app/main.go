@@ -131,10 +131,37 @@ func handleCd(path string) {
 	}
 }
 
+func splitBySingleQuotes(input string) []string {
+	var result []string
+	var current string
+	var inQuotes bool = false
+	for i := range len(input) {
+		var curChar = input[i]
+		if curChar == '\'' {
+			if inQuotes {
+				result = append(result, current)
+				current = ""
+			}
+			inQuotes = !inQuotes
+		} else if curChar == ' ' && !inQuotes {
+			if current != "" {
+				result = append(result, current)
+				current = ""
+			}
+		} else {
+			current += string(curChar)
+		}
+	}
+	if current != "" {
+		result = append(result, current)
+	}
+	return result
+}
+
 // Process the command entered by the user
 func processCommand(input string, paths []string) bool {
 	// Split the command into words
-	words := strings.Fields(input)
+	words := splitBySingleQuotes(input)
 
 	// Handle empty input
 	if len(words) == 0 {
