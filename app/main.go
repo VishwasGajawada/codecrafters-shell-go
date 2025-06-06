@@ -131,15 +131,25 @@ func handleCd(path string) {
 	}
 }
 
-func splitBySingleQuotes(input string) []string {
+func splitByQuotes(input string) []string {
 	var result []string
 	var current string
-	var inQuotes bool = false
-	for i := range len(input) {
+	inSingleQuotes, inDoubleQuotes := false, false
+	for i := 0; i < len(input); i++ {
 		var curChar = input[i]
-		if curChar == '\'' {
-			inQuotes = !inQuotes
-		} else if curChar == ' ' && !inQuotes {
+		if curChar == '\'' && !inDoubleQuotes {
+			inSingleQuotes = !inSingleQuotes
+		} else if curChar == '"' && !inSingleQuotes {
+			inDoubleQuotes = !inDoubleQuotes
+		} else if curChar == '\\' && (i+1) < len(input) {
+			nextChar := input[i+1]
+			if nextChar == '$' || nextChar == '"' || nextChar == '\\' {
+				current += string(nextChar)
+				i++ // Skip the next character since it's escaped
+			} else {
+				current += string(curChar) // Just add the backslash
+			}
+		} else if curChar == ' ' && !inSingleQuotes && !inDoubleQuotes {
 			if current != "" {
 				result = append(result, current)
 				current = ""
@@ -157,7 +167,7 @@ func splitBySingleQuotes(input string) []string {
 // Process the command entered by the user
 func processCommand(input string, paths []string) bool {
 	// Split the command into words
-	words := splitBySingleQuotes(input)
+	words := splitByQuotes(input)
 
 	// Handle empty input
 	if len(words) == 0 {
