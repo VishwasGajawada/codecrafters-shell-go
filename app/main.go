@@ -142,13 +142,22 @@ func splitByQuotes(input string) []string {
 		} else if curChar == '"' && !inSingleQuotes {
 			inDoubleQuotes = !inDoubleQuotes
 		} else if curChar == '\\' && (i+1) < len(input) {
-			nextChar := input[i+1]
-			if nextChar == '$' || nextChar == '"' || nextChar == '\\' {
-				current += string(nextChar)
-				i++ // Skip the next character since it's escaped
+			if inSingleQuotes {
+				current += string(curChar)
+			} else if inDoubleQuotes {
+				nextChar := input[i+1]
+				if nextChar == '$' || nextChar == '"' || nextChar == '\\' {
+					current += string(nextChar)
+					i++ // Skip the next character since it's escaped
+				} else {
+					current += string(curChar) // Just add the backslash
+				}
 			} else {
-				current += string(curChar) // Just add the backslash
+				nextChar := input[i+1]
+				current += string(nextChar)
+				i++
 			}
+
 		} else if curChar == ' ' && !inSingleQuotes && !inDoubleQuotes {
 			if current != "" {
 				result = append(result, current)
