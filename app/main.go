@@ -134,39 +134,46 @@ func handleCd(path string) {
 func splitByQuotes(input string) []string {
 	var result []string
 	var current string
-	inSingleQuotes, inDoubleQuotes := false, false
-	for i := 0; i < len(input); i++ {
+	inSingleQuotes, inDoubleQuotes, escaped := false, false, false
+	for i := range len(input) {
 		var curChar = input[i]
-		if curChar == '\'' && !inDoubleQuotes {
+
+		switch {
+		case escaped:
+			// If the current character is escaped, just add it to the current string
+			current += string(input[i])
+			escaped = false
+
+		case curChar == '\'' && !inDoubleQuotes:
 			inSingleQuotes = !inSingleQuotes
-		} else if curChar == '"' && !inSingleQuotes {
+
+		case curChar == '"' && !inSingleQuotes:
 			inDoubleQuotes = !inDoubleQuotes
-		} else if curChar == '\\' && (i+1) < len(input) {
-			if inSingleQuotes {
-				current += string(curChar)
-			} else if inDoubleQuotes {
-				nextChar := input[i+1]
-				if nextChar == '$' || nextChar == '"' || nextChar == '\\' {
-					current += string(nextChar)
-					i++ // Skip the next character since it's escaped
-				} else {
-					current += string(curChar) // Just add the backslash
-				}
+
+		case curChar == '\\' && !inSingleQuotes && !inDoubleQuotes:
+			escaped = true
+
+		case curChar == '\\' && inDoubleQuotes:
+			// escape next character if it is $, " or \
+			if (i+1) < len(input) && (input[i+1] == '$' || input[i+1] == '"' || input[i+1] == '\\') {
+				escaped = true
 			} else {
-				nextChar := input[i+1]
-				current += string(nextChar)
-				i++
+				current += string(curChar) // Just add the backslash if not escaping
 			}
 
-		} else if curChar == ' ' && !inSingleQuotes && !inDoubleQuotes {
+		case curChar == ' ' && !inSingleQuotes && !inDoubleQuotes:
+			// If we encounter a space and not in quotes, finalize the current word
 			if current != "" {
 				result = append(result, current)
 				current = ""
 			}
-		} else {
+
+		default:
+			// Otherwise, just add the character to the current word
 			current += string(curChar)
 		}
 	}
+
 	if current != "" {
 		result = append(result, current)
 	}
