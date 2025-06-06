@@ -138,10 +138,6 @@ func splitBySingleQuotes(input string) []string {
 	for i := range len(input) {
 		var curChar = input[i]
 		if curChar == '\'' {
-			if inQuotes {
-				result = append(result, current)
-				current = ""
-			}
 			inQuotes = !inQuotes
 		} else if curChar == ' ' && !inQuotes {
 			if current != "" {
