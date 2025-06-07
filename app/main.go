@@ -14,8 +14,10 @@ var builtIns = []string{"echo", "type", "exit", "pwd", "cd"}
 var paths = strings.Split(os.Getenv("PATH"), ":")
 
 type Command struct {
-	name string
-	args []string
+	name         string
+	args         []string
+	outputStream *os.File
+	errorStream  *os.File
 }
 
 // Helpers
@@ -96,42 +98,75 @@ func isShellBuiltin(command string) bool {
 }
 
 // Handle the "echo" command
-func handleEcho(words []string) {
-	fmt.Fprintln(os.Stdout, strings.Join(words, " "))
+func handleEcho(command *Command) {
+	fmt.Fprintln(command.outputStream, strings.Join(command.args, " "))
 }
 
 // Handle the "type" command
-func handleType(word string) {
-	if isShellBuiltin(word) {
-		fmt.Fprintf(os.Stdout, "%s is a shell builtin\n", word)
+func handleType(command *Command) {
+	if isShellBuiltin(command.args[0]) {
+		fmt.Fprintf(command.outputStream, "%s is a shell builtin\n", command.args[0])
 		return
 	}
 
-	filePath, found := findExecutablePath(word)
+	filePath, found := findExecutablePath(command.args[0])
 
 	if found {
-		fmt.Fprintf(os.Stdout, "%s is %s\n", word, filePath)
+		fmt.Fprintf(command.outputStream, "%s is %s\n", command.args[0], filePath)
 	} else {
-		fmt.Fprintf(os.Stdout, "%s: not found\n", word)
+		fmt.Fprintf(command.errorStream, "%s: not found\n", command.args[0])
 	}
 }
 
-func handlePwd() string {
+func handlePwd(command *Command) string {
 	cwd, _ := os.Getwd()
-	fmt.Fprintln(os.Stdout, cwd)
+	fmt.Fprintln(command.outputStream, cwd)
 	return cwd
 }
 
-func handleCd(path string) {
-	absolutePath := getAbsolutePath(path)
+func handleCd(command *Command) {
+	if command.args == nil || len(command.args) != 1 {
+		fmt.Fprintln(command.errorStream, "cd: missing argument")
+		return
+	}
+	absolutePath := getAbsolutePath(command.args[0])
 	if isValidPath(absolutePath) {
 		os.Chdir(absolutePath)
 	} else {
-		fmt.Fprintf(os.Stderr, "cd: %s: No such file or directory\n", absolutePath)
+		fmt.Fprintf(command.errorStream, "cd: %s: No such file or directory\n", absolutePath)
 	}
 }
 
-func splitByQuotes(input string) []string {
+func splitSingleWordByRedirects(input string) []string {
+	var result []string
+	var current string
+	for i := 0; i < len(input); i++ {
+		if input[i] == '>' || input[i] == '<' {
+			if current != "" {
+				result = append(result, current)
+			}
+			if current != "1" {
+				result = append(result, "1") // Default output stream if not specified
+			}
+			current = ""
+			// Handle multiple redirects
+			if i+1 < len(input) && input[i] == input[i+1] {
+				result = append(result, string(input[i])+string(input[i+1]))
+				i++ // Skip the next character as it's part of the redirect
+			} else {
+				result = append(result, string(input[i]))
+			}
+		} else {
+			current += string(input[i])
+		}
+	}
+	if current != "" {
+		result = append(result, current)
+	}
+	return result
+}
+
+func splitByQuotesAndRedirects(input string) []string {
 	var result []string
 	var current string
 	inSingleQuotes, inDoubleQuotes, escaped := false, false, false
@@ -163,10 +198,13 @@ func splitByQuotes(input string) []string {
 
 		case curChar == ' ' && !inSingleQuotes && !inDoubleQuotes:
 			// If we encounter a space and not in quotes, finalize the current word
-			if current != "" {
-				result = append(result, current)
-				current = ""
+			// Split current by >, >>, <, << and add the separated parts to the result
+			// fmt.Println("current before redirect split:", current)
+			currentAfterRedirects := splitSingleWordByRedirects(current)
+			if len(currentAfterRedirects) > 0 {
+				result = append(result, currentAfterRedirects...)
 			}
+			current = ""
 
 		default:
 			// Otherwise, just add the character to the current word
@@ -182,7 +220,7 @@ func splitByQuotes(input string) []string {
 
 func getCommand(input string) *Command {
 	// Split the input into words
-	words := splitByQuotes(input)
+	words := splitByQuotesAndRedirects(input)
 
 	// Handle empty input
 	if len(words) == 0 {
@@ -191,9 +229,40 @@ func getCommand(input string) *Command {
 
 	// The first word is the command name, the rest are arguments
 	commandName := words[0]
-	args := words[1:]
+	var args []string
+	var outputStream *os.File = nil
+	var errorStream *os.File = nil
 
-	return &Command{name: commandName, args: args}
+	for i := 1; i < len(words); i++ {
+		if words[i] == ">" || words[i] == ">>" {
+			fileOpenBitMask := os.O_CREATE | os.O_WRONLY
+			if words[i] == ">>" {
+				fileOpenBitMask |= os.O_APPEND
+			}
+
+			if i+1 < len(words) {
+				if words[i-1] == "1" {
+					outputStream, _ = os.OpenFile(words[i+1], fileOpenBitMask, 0644)
+				} else if words[i-1] == "2" {
+					errorStream, _ = os.OpenFile(words[i+1], fileOpenBitMask, 0644)
+				} else {
+					fmt.Println("something went wrong")
+				}
+				i++ // Skip the next word as it is the filename
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: '>>' requires a filename")
+			}
+		}
+	}
+
+	if outputStream == nil {
+		outputStream = os.Stdout // Default output stream
+	}
+	if errorStream == nil {
+		errorStream = os.Stderr // Default error stream
+	}
+
+	return &Command{name: commandName, args: args, outputStream: outputStream, errorStream: errorStream}
 }
 
 // Process the command entered by the user
@@ -205,32 +274,28 @@ func processCommand(input string) bool {
 	case "exit":
 		return true // Exit the shell
 	case "echo":
-		handleEcho(command.args)
+		handleEcho(command)
 		return false // Continue the shell
 	case "type":
-		handleType(command.args[0])
+		handleType(command)
 		return false // Continue the shell
 	case "pwd":
 		// Handle "pwd" command
-		handlePwd()
+		handlePwd(command)
 		return false
 	case "cd":
-		if command.args == nil || len(command.args) != 1 {
-			fmt.Fprintln(os.Stderr, "cd: missing argument")
-			return false
-		}
-		handleCd(command.args[0]) //only absolute paths are supported
+		handleCd(command)
 		return false
 
 	default:
 		_, found := findExecutablePath(command.name)
 		if !found {
-			fmt.Fprintf(os.Stderr, "%s: command not found\n", command.name)
+			fmt.Fprintf(command.outputStream, "%s: command not found\n", command.name)
 			return false
 		} else {
 			var cmd = exec.Command(command.name, command.args...)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
+			cmd.Stdout = command.outputStream
+			cmd.Stderr = command.errorStream
 			cmd.Run()
 		}
 		return false
