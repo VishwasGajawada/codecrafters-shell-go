@@ -11,6 +11,12 @@ import (
 
 // Globals
 var builtIns = []string{"echo", "type", "exit", "pwd", "cd"}
+var paths = strings.Split(os.Getenv("PATH"), ":")
+
+type Command struct {
+	name string
+	args []string
+}
 
 // Helpers
 
@@ -70,7 +76,7 @@ func getAbsolutePath(path string) string {
 	}
 }
 
-func findExecutablePath(command string, paths []string) (string, bool) {
+func findExecutablePath(command string) (string, bool) {
 	// Check if the command exists in the given paths
 	for _, dir := range paths {
 		fullPath := fmt.Sprintf("%s/%s", dir, command)
@@ -91,28 +97,22 @@ func isShellBuiltin(command string) bool {
 
 // Handle the "echo" command
 func handleEcho(words []string) {
-	if len(words) > 1 {
-		fmt.Fprintln(os.Stdout, strings.Join(words[1:], " "))
-	} else {
-		fmt.Fprintln(os.Stdout, "")
-	}
+	fmt.Fprintln(os.Stdout, strings.Join(words, " "))
 }
 
 // Handle the "type" command
-func handleType(words []string, paths []string) {
-	if len(words) == 2 {
-		if isShellBuiltin(words[1]) {
-			fmt.Fprintf(os.Stdout, "%s is a shell builtin\n", words[1])
-			return
-		}
+func handleType(word string) {
+	if isShellBuiltin(word) {
+		fmt.Fprintf(os.Stdout, "%s is a shell builtin\n", word)
+		return
+	}
 
-		filePath, found := findExecutablePath(words[1], paths)
+	filePath, found := findExecutablePath(word)
 
-		if found {
-			fmt.Fprintf(os.Stdout, "%s is %s\n", words[1], filePath)
-		} else {
-			fmt.Fprintf(os.Stdout, "%s: not found\n", words[1])
-		}
+	if found {
+		fmt.Fprintf(os.Stdout, "%s is %s\n", word, filePath)
+	} else {
+		fmt.Fprintf(os.Stdout, "%s: not found\n", word)
 	}
 }
 
@@ -180,47 +180,55 @@ func splitByQuotes(input string) []string {
 	return result
 }
 
-// Process the command entered by the user
-func processCommand(input string, paths []string) bool {
-	// Split the command into words
+func getCommand(input string) *Command {
+	// Split the input into words
 	words := splitByQuotes(input)
 
 	// Handle empty input
 	if len(words) == 0 {
-		return false
+		return nil
 	}
 
-	command := words[0]
+	// The first word is the command name, the rest are arguments
+	commandName := words[0]
 	args := words[1:]
 
-	switch command {
+	return &Command{name: commandName, args: args}
+}
+
+// Process the command entered by the user
+func processCommand(input string) bool {
+	// Split the command into words
+	command := getCommand(input)
+
+	switch command.name {
 	case "exit":
 		return true // Exit the shell
 	case "echo":
-		handleEcho(words)
+		handleEcho(command.args)
 		return false // Continue the shell
 	case "type":
-		handleType(words, paths)
+		handleType(command.args[0])
 		return false // Continue the shell
 	case "pwd":
 		// Handle "pwd" command
 		handlePwd()
 		return false
 	case "cd":
-		if args == nil || len(args) != 1 {
+		if command.args == nil || len(command.args) != 1 {
 			fmt.Fprintln(os.Stderr, "cd: missing argument")
 			return false
 		}
-		handleCd(args[0]) //only absolute paths are supported
+		handleCd(command.args[0]) //only absolute paths are supported
 		return false
 
 	default:
-		_, found := findExecutablePath(words[0], paths)
+		_, found := findExecutablePath(command.name)
 		if !found {
-			fmt.Fprintf(os.Stderr, "%s: command not found\n", words[0])
+			fmt.Fprintf(os.Stderr, "%s: command not found\n", command.name)
 			return false
 		} else {
-			var cmd = exec.Command(words[0], args...)
+			var cmd = exec.Command(command.name, command.args...)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			cmd.Run()
@@ -230,8 +238,6 @@ func processCommand(input string, paths []string) bool {
 }
 
 func main() {
-	var path = os.Getenv("PATH")
-	var paths []string = strings.Split(path, ":")
 	for {
 		printPrompt()
 
@@ -243,7 +249,7 @@ func main() {
 		}
 
 		// Process the command
-		if processCommand(command, paths) {
+		if processCommand(command) {
 			break
 		}
 	}
