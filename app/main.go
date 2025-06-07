@@ -145,7 +145,7 @@ func splitSingleWordByRedirects(input string) []string {
 			if current != "" {
 				result = append(result, current)
 			}
-			if current != "1" {
+			if current != "1" && current != "2" {
 				result = append(result, "1") // Default output stream if not specified
 			}
 			current = ""
@@ -201,6 +201,7 @@ func splitByQuotesAndRedirects(input string) []string {
 			// Split current by >, >>, <, << and add the separated parts to the result
 			// fmt.Println("current before redirect split:", current)
 			currentAfterRedirects := splitSingleWordByRedirects(current)
+			// fmt.Println("current after redirect split:", currentAfterRedirects)
 			if len(currentAfterRedirects) > 0 {
 				result = append(result, currentAfterRedirects...)
 			}
@@ -213,7 +214,10 @@ func splitByQuotesAndRedirects(input string) []string {
 	}
 
 	if current != "" {
-		result = append(result, current)
+		currentAfterRedirects := splitSingleWordByRedirects(current)
+		if len(currentAfterRedirects) > 0 {
+			result = append(result, currentAfterRedirects...)
+		}
 	}
 	return result
 }
@@ -221,6 +225,7 @@ func splitByQuotesAndRedirects(input string) []string {
 func getCommand(input string) *Command {
 	// Split the input into words
 	words := splitByQuotesAndRedirects(input)
+	// fmt.Println("Words after splitting:", words)
 
 	// Handle empty input
 	if len(words) == 0 {
