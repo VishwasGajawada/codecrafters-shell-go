@@ -232,7 +232,7 @@ func getCommand(input string) *Command {
 	var args []string
 	var outputStream *os.File = nil
 	var errorStream *os.File = nil
-
+	var notIncludeInArgs = make([]bool, len(words))
 	for i := 1; i < len(words); i++ {
 		if words[i] == ">" || words[i] == ">>" {
 			fileOpenBitMask := os.O_CREATE | os.O_WRONLY
@@ -248,10 +248,19 @@ func getCommand(input string) *Command {
 				} else {
 					fmt.Println("something went wrong")
 				}
+				notIncludeInArgs[i-1] = true // Mark the previous word as not an argument
+				notIncludeInArgs[i] = true   // Mark the current word as not an argument
+				notIncludeInArgs[i+1] = true // Mark the next word (filename) as not an argument
+
 				i++ // Skip the next word as it is the filename
 			} else {
 				fmt.Fprintln(os.Stderr, "Error: '>>' requires a filename")
 			}
+		}
+	}
+	for i := 1; i < len(words); i++ {
+		if !notIncludeInArgs[i] {
+			args = append(args, words[i])
 		}
 	}
 
