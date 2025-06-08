@@ -111,13 +111,13 @@ func (s *Shell) processCommand(input string) bool {
 
 // executeExternalCommand finds and runs an external command.
 func (s *Shell) executeExternalCommand(cmd *types.Command) {
-	fullPath, found := s.pathFinder.FindExecutablePath(cmd.Name)
+	_, found := s.pathFinder.FindExecutablePath(cmd.Name)
 	if !found {
 		fmt.Fprintf(cmd.ErrorStream, "%s: command not found\n", cmd.Name)
 		return
 	}
 
-	execCmd := exec.Command(fullPath, cmd.Args...)
+	execCmd := exec.Command(cmd.Name, cmd.Args...)
 	execCmd.Stdout = cmd.OutputStream
 	execCmd.Stderr = cmd.ErrorStream
 	execCmd.Stdin = os.Stdin // External commands should inherit stdin by default
