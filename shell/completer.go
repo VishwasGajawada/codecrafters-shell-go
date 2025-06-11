@@ -20,28 +20,65 @@ func CreateReadlineCompleter(builtIns []string) *readline.PrefixCompleter {
 }
 
 type TabCompleter struct {
-	builtIns         []string
-	path_executables []string
+	builtIns                       []string
+	path_executables               []string
+	tabPressedAfterMultipleResults bool
+	lastEnteredLine                string
+}
+
+func ringBell() {
+	// Ring the bell (alert) to indicate no completion found
+	fmt.Print("\x07")
 }
 
 func (t *TabCompleter) Do(line []rune, pos int) ([][]rune, int) {
 	candidates := make([][]rune, 0)
 	for _, cmd := range t.builtIns {
 		if len(cmd) >= pos && string(line) == cmd[:pos] {
-			candidates = append(candidates, []rune(cmd[pos:]+" ")) // Added space at the end
+			candidates = append(candidates, []rune(cmd)) // Added space at the end
 		}
 	}
 	// fmt.Println(len(t.path_executables))
 	for _, cmd := range t.path_executables {
 		if len(cmd) >= pos && string(line) == cmd[:pos] {
-			candidates = append(candidates, []rune(cmd[pos:]+" ")) // Added space at the end
+			candidates = append(candidates, []rune(cmd)) // Added space at the end
 		}
 	}
 
+	if len(t.lastEnteredLine) > 0 && string(line) != t.lastEnteredLine {
+		t.tabPressedAfterMultipleResults = false // Reset if the line has changed
+	}
+	t.lastEnteredLine = string(line)
+
 	if len(candidates) == 0 {
-		// Ring the bell (alert) and return the current input
-		fmt.Print("\x07")
+		ringBell()
+		t.tabPressedAfterMultipleResults = false
 		return nil, pos
 	}
-	return candidates, pos
+
+	if len(candidates) == 1 {
+		t.tabPressedAfterMultipleResults = false
+		candidateWithSpace := append(candidates[0][pos:], ' ')
+		// just return candidate[0] appended with space, but return as [][]rune
+		return [][]rune{candidateWithSpace}, pos
+	}
+
+	if !t.tabPressedAfterMultipleResults {
+		t.tabPressedAfterMultipleResults = true
+		ringBell()
+	} else {
+		// print candidates separated by space
+		fmt.Println()
+		for i, candidate := range candidates {
+			fmt.Print(string(candidate))
+			if i < len(candidates)-1 { // Add space only for non-last elements
+				fmt.Print("  ")
+			}
+		}
+		fmt.Println() // Print a newline after all candidates
+		fmt.Print("$ " + string(line))
+		t.tabPressedAfterMultipleResults = false // Reset after displaying candidates
+	}
+
+	return nil, pos
 }

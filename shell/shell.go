@@ -28,9 +28,13 @@ func NewShell() *Shell {
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:          "$ ",
-		InterruptPrompt: "^C",                                                                             // Text to show on Ctrl+C
-		EOFPrompt:       "exit",                                                                           // Text to show on Ctrl+D
-		AutoComplete:    &TabCompleter{builtIns: builtIns, path_executables: pathFinder.GetExecutables()}, // <--- Assign our custom completer
+		InterruptPrompt: "^C",   // Text to show on Ctrl+C
+		EOFPrompt:       "exit", // Text to show on Ctrl+D
+		AutoComplete: &TabCompleter{
+			builtIns: builtIns,
+			// path_executables: make([]string, 0), // Initialize with an empty slice
+			path_executables:               pathFinder.GetExecutables(),
+			tabPressedAfterMultipleResults: false}, // <--- Assign our custom completer
 		// AutoComplete:    CreateReadlineCompleter(builtIns), // <--- Assign our custom completer
 	})
 
