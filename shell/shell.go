@@ -24,12 +24,13 @@ type Shell struct {
 // NewShell creates and initializes a new Shell instance.
 func NewShell() *Shell {
 	builtIns := []string{"echo", "type", "exit", "pwd", "cd"}
+	pathFinder := fsutil.NewFinder(strings.Split(os.Getenv("PATH"), ":")) // Initialize path finder
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:          "$ ",
-		InterruptPrompt: "^C",                              // Text to show on Ctrl+C
-		EOFPrompt:       "exit",                            // Text to show on Ctrl+D
-		AutoComplete:    &TabCompleter{builtIns: builtIns}, // <--- Assign our custom completer
+		InterruptPrompt: "^C",                                                                             // Text to show on Ctrl+C
+		EOFPrompt:       "exit",                                                                           // Text to show on Ctrl+D
+		AutoComplete:    &TabCompleter{builtIns: builtIns, path_executables: pathFinder.GetExecutables()}, // <--- Assign our custom completer
 		// AutoComplete:    CreateReadlineCompleter(builtIns), // <--- Assign our custom completer
 	})
 
@@ -39,7 +40,7 @@ func NewShell() *Shell {
 	}
 	return &Shell{
 		builtIns:   builtIns,
-		pathFinder: fsutil.NewFinder(strings.Split(os.Getenv("PATH"), ":")),
+		pathFinder: pathFinder,
 		rl:         rl,
 	}
 }

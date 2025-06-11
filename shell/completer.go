@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/chzyer/readline"
+	// Import the fsutil package for path management
 )
 
 // createReadlineCompleter generates and returns a readline.Completer instance.
@@ -19,7 +20,8 @@ func CreateReadlineCompleter(builtIns []string) *readline.PrefixCompleter {
 }
 
 type TabCompleter struct {
-	builtIns []string
+	builtIns         []string
+	path_executables []string
 }
 
 func (t *TabCompleter) Do(line []rune, pos int) ([][]rune, int) {
@@ -29,6 +31,13 @@ func (t *TabCompleter) Do(line []rune, pos int) ([][]rune, int) {
 			candidates = append(candidates, []rune(cmd[pos:]+" ")) // Added space at the end
 		}
 	}
+	// fmt.Println(len(t.path_executables))
+	for _, cmd := range t.path_executables {
+		if len(cmd) >= pos && string(line) == cmd[:pos] {
+			candidates = append(candidates, []rune(cmd[pos:]+" ")) // Added space at the end
+		}
+	}
+
 	if len(candidates) == 0 {
 		// Ring the bell (alert) and return the current input
 		fmt.Print("\x07")

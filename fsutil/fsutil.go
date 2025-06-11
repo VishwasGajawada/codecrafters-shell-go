@@ -67,3 +67,23 @@ func (f *Finder) FindExecutablePath(command string) (string, bool) {
 	}
 	return "", false
 }
+
+func (f *Finder) GetExecutables() []string {
+	executables := []string{}
+	for _, dir := range f.paths {
+		files, err := os.ReadDir(dir)
+		if err != nil {
+			continue // Skip directories that cannot be read
+		}
+		for _, file := range files {
+			if file.IsDir() {
+				continue // Skip directories
+			}
+			if info, err := file.Info(); err == nil && info.Mode()&0111 != 0 { // Check if executable
+				executables = append(executables, file.Name()) // Use filepath.Join for full path
+				// executables = append(executables, filepath.Join(dir, file.Name())) // Use filepath.Join for full path
+			}
+		}
+	}
+	return executables
+}
