@@ -2,6 +2,7 @@ package shell
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/chzyer/readline"
 	// Import the fsutil package for path management
@@ -33,13 +34,13 @@ func ringBell() {
 
 func (t *TabCompleter) Do(line []rune, pos int) ([][]rune, int) {
 	candidates := make([][]rune, 0)
-	for _, cmd := range t.builtIns {
-		if len(cmd) >= pos && string(line) == cmd[:pos] {
-			candidates = append(candidates, []rune(cmd)) // Added space at the end
-		}
-	}
-	// fmt.Println(len(t.path_executables))
-	for _, cmd := range t.path_executables {
+	allCommands := make([]string, 0)
+	allCommands = append(allCommands, t.builtIns...)
+	allCommands = append(allCommands, t.path_executables...)
+
+	sort.Strings(allCommands) // Sort the commands for better output
+
+	for _, cmd := range allCommands {
 		if len(cmd) >= pos && string(line) == cmd[:pos] {
 			candidates = append(candidates, []rune(cmd)) // Added space at the end
 		}
