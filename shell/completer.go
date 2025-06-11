@@ -1,6 +1,8 @@
 package shell
 
 import (
+	"fmt"
+
 	"github.com/chzyer/readline"
 )
 
@@ -14,4 +16,23 @@ func CreateReadlineCompleter(builtIns []string) *readline.PrefixCompleter {
 	}
 	// Create and return the PrefixCompleter
 	return readline.NewPrefixCompleter(completers...)
+}
+
+type TabCompleter struct {
+	builtIns []string
+}
+
+func (t *TabCompleter) Do(line []rune, pos int) ([][]rune, int) {
+	candidates := make([][]rune, 0)
+	for _, cmd := range t.builtIns {
+		if len(cmd) >= pos && string(line) == cmd[:pos] {
+			candidates = append(candidates, []rune(cmd[pos:]+" ")) // Added space at the end
+		}
+	}
+	if len(candidates) == 0 {
+		// Ring the bell (alert) and return the current input
+		fmt.Print("\x07")
+		return nil, pos
+	}
+	return candidates, pos
 }

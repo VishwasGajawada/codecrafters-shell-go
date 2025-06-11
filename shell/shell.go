@@ -29,7 +29,8 @@ func NewShell() *Shell {
 		Prompt:          "$ ",
 		InterruptPrompt: "^C",                              // Text to show on Ctrl+C
 		EOFPrompt:       "exit",                            // Text to show on Ctrl+D
-		AutoComplete:    CreateReadlineCompleter(builtIns), // <--- Assign our custom completer
+		AutoComplete:    &TabCompleter{builtIns: builtIns}, // <--- Assign our custom completer
+		// AutoComplete:    CreateReadlineCompleter(builtIns), // <--- Assign our custom completer
 	})
 
 	if err != nil {
