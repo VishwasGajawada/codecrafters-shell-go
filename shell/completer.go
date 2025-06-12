@@ -32,13 +32,30 @@ func ringBell() {
 	fmt.Print("\x07")
 }
 
+func getUniqueStrings(strs []string) []string {
+	// Create a map to track unique strings
+	uniqueMap := make(map[string]struct{})
+	for _, str := range strs {
+		uniqueMap[str] = struct{}{}
+	}
+
+	// Convert the map keys back to a slice
+	uniqueStrs := make([]string, 0, len(uniqueMap))
+	for str := range uniqueMap {
+		uniqueStrs = append(uniqueStrs, str)
+	}
+	return uniqueStrs
+}
+
 func (t *TabCompleter) Do(line []rune, pos int) ([][]rune, int) {
 	candidates := make([][]rune, 0)
 	allCommands := make([]string, 0)
 	allCommands = append(allCommands, t.builtIns...)
 	allCommands = append(allCommands, t.path_executables...)
 
-	sort.Strings(allCommands) // Sort the commands for better output
+	// retain only unique
+	allCommands = getUniqueStrings(allCommands) // Ensure allCommands contains unique commands
+	sort.Strings(allCommands)                   // Sort the commands for better output
 
 	for _, cmd := range allCommands {
 		if len(cmd) >= pos && string(line) == cmd[:pos] {

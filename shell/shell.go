@@ -31,7 +31,7 @@ func NewShell() *Shell {
 		InterruptPrompt: "^C",   // Text to show on Ctrl+C
 		EOFPrompt:       "exit", // Text to show on Ctrl+D
 		AutoComplete: &TabCompleter{
-			builtIns: builtIns,
+			builtIns:         builtIns,
 			// path_executables: make([]string, 0), // Initialize with an empty slice
 			path_executables:               pathFinder.GetExecutables(),
 			tabPressedAfterMultipleResults: false}, // <--- Assign our custom completer
