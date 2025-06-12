@@ -4,25 +4,11 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/chzyer/readline"
-	// Import the fsutil package for path management
+	"github.com/codecrafters-io/shell-starter-go/trie"
 )
 
-// createReadlineCompleter generates and returns a readline.Completer instance.
-// It takes the list of built-in commands to use for completion.
-func CreateReadlineCompleter(builtIns []string) *readline.PrefixCompleter {
-	var completers []readline.PrefixCompleterInterface
-	// Dynamically create PrefixCompleter items for each built-in command
-	for _, cmd := range builtIns {
-		completers = append(completers, readline.PcItem(cmd))
-	}
-	// Create and return the PrefixCompleter
-	return readline.NewPrefixCompleter(completers...)
-}
-
 type TabCompleter struct {
-	builtIns                       []string
-	path_executables               []string
+	trie                           *trie.TrieNode // Assuming TrieNode is defined in trie package
 	tabPressedAfterMultipleResults bool
 	lastEnteredLine                string
 }
@@ -48,20 +34,11 @@ func getUniqueStrings(strs []string) []string {
 }
 
 func (t *TabCompleter) Do(line []rune, pos int) ([][]rune, int) {
-	candidates := make([][]rune, 0)
-	allCommands := make([]string, 0)
-	allCommands = append(allCommands, t.builtIns...)
-	allCommands = append(allCommands, t.path_executables...)
+	candidates := t.trie.GetAllMatching(string(line))
 
 	// retain only unique
-	allCommands = getUniqueStrings(allCommands) // Ensure allCommands contains unique commands
-	sort.Strings(allCommands)                   // Sort the commands for better output
-
-	for _, cmd := range allCommands {
-		if len(cmd) >= pos && string(line) == cmd[:pos] {
-			candidates = append(candidates, []rune(cmd)) // Added space at the end
-		}
-	}
+	candidates = getUniqueStrings(candidates) // Ensure candidates contains unique commands
+	sort.Strings(candidates)                  // Sort the commands for better output
 
 	if len(t.lastEnteredLine) > 0 && string(line) != t.lastEnteredLine {
 		t.tabPressedAfterMultipleResults = false // Reset if the line has changed
@@ -70,15 +47,19 @@ func (t *TabCompleter) Do(line []rune, pos int) ([][]rune, int) {
 
 	if len(candidates) == 0 {
 		ringBell()
-		t.tabPressedAfterMultipleResults = false
 		return nil, pos
 	}
 
 	if len(candidates) == 1 {
-		t.tabPressedAfterMultipleResults = false
-		candidateWithSpace := append(candidates[0][pos:], ' ')
-		// just return candidate[0] appended with space, but return as [][]rune
-		return [][]rune{candidateWithSpace}, pos
+		return [][]rune{append([]rune(candidates[0][pos:]), ' ')}, pos
+	}
+
+	// now there are multiple candidates
+	longestPrefix := t.trie.GetLongestCommonPrefix(candidates[0], len(candidates))
+	if len(longestPrefix) > pos {
+		// If the longest common prefix is longer than the current position,
+		// we can complete the line up to that prefix.
+		return [][]rune{[]rune(longestPrefix)[pos:]}, len(longestPrefix)
 	}
 
 	if !t.tabPressedAfterMultipleResults {
@@ -89,13 +70,13 @@ func (t *TabCompleter) Do(line []rune, pos int) ([][]rune, int) {
 		fmt.Println()
 		for i, candidate := range candidates {
 			fmt.Print(string(candidate))
-			if i < len(candidates)-1 { // Add space only for non-last elements
+			if i < len(candidates)-1 {
 				fmt.Print("  ")
 			}
 		}
-		fmt.Println() // Print a newline after all candidates
+		fmt.Println()
 		fmt.Print("$ " + string(line))
-		t.tabPressedAfterMultipleResults = false // Reset after displaying candidates
+		t.tabPressedAfterMultipleResults = false
 	}
 
 	return nil, pos

@@ -11,7 +11,8 @@ import (
 	builtin "github.com/codecrafters-io/shell-starter-go/builtins" // Import builtin package
 	"github.com/codecrafters-io/shell-starter-go/fsutil"           // Import fsutil package
 	"github.com/codecrafters-io/shell-starter-go/parser"           // Import parser package
-	"github.com/codecrafters-io/shell-starter-go/types"            // Import parser package
+	"github.com/codecrafters-io/shell-starter-go/trie"             // Import trie package for autocompletion
+	"github.com/codecrafters-io/shell-starter-go/types"            // Import types package
 )
 
 // Shell encapsulates the state and behavior of the shell.
@@ -26,16 +27,18 @@ func NewShell() *Shell {
 	builtIns := []string{"echo", "type", "exit", "pwd", "cd"}
 	pathFinder := fsutil.NewFinder(strings.Split(os.Getenv("PATH"), ":")) // Initialize path finder
 
+	allCommands := make([]string, 0)
+	allCommands = append(allCommands, builtIns...)
+	allCommands = append(allCommands, pathFinder.GetExecutables()...) // Get executables from PATH
+
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:          "$ ",
 		InterruptPrompt: "^C",   // Text to show on Ctrl+C
 		EOFPrompt:       "exit", // Text to show on Ctrl+D
 		AutoComplete: &TabCompleter{
-			builtIns:         builtIns,
-			// path_executables: make([]string, 0), // Initialize with an empty slice
-			path_executables:               pathFinder.GetExecutables(),
-			tabPressedAfterMultipleResults: false}, // <--- Assign our custom completer
-		// AutoComplete:    CreateReadlineCompleter(builtIns), // <--- Assign our custom completer
+			trie:                           trie.NewTrieNode(allCommands), // Initialize trie with all commands
+			tabPressedAfterMultipleResults: false,
+		},
 	})
 
 	if err != nil {
