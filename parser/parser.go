@@ -3,6 +3,8 @@ package parser
 import (
 	"fmt"
 	"os"
+	"strings"
+	"unicode"
 
 	"github.com/codecrafters-io/shell-starter-go/types" // Import the shell package to use its Command struct
 )
@@ -36,66 +38,145 @@ func splitSingleWordByRedirects(input string) []string {
 	return result
 }
 
-func splitByQuotesAndRedirects(input string) []string {
-	var result []string
-	var current string
-	inSingleQuotes, inDoubleQuotes, escaped := false, false, false
+func splitByPipes(input string) []string {
+	var (
+		result         []string
+		current        string
+		inSingleQuotes bool
+		inDoubleQuotes bool
+		escaped        bool
+	)
 	for i := range len(input) {
-		var curChar = input[i]
-
+		c := input[i]
 		switch {
 		case escaped:
-			// If the current character is escaped, just add it to the current string
-			current += string(input[i])
+			current += string(c)
 			escaped = false
-
-		case curChar == '\'' && !inDoubleQuotes:
-			inSingleQuotes = !inSingleQuotes
-
-		case curChar == '"' && !inSingleQuotes:
-			inDoubleQuotes = !inDoubleQuotes
-
-		case curChar == '\\' && !inSingleQuotes && !inDoubleQuotes:
+		case c == '\\' && !inSingleQuotes:
 			escaped = true
-
-		case curChar == '\\' && inDoubleQuotes:
-			// escape next character if it is $, " or \
-			if (i+1) < len(input) && (input[i+1] == '$' || input[i+1] == '"' || input[i+1] == '\\') {
-				escaped = true
-			} else {
-				current += string(curChar) // Just add the backslash if not escaping
+			current += string(c) // keep escape character in first token
+		case c == '\'' && !inDoubleQuotes:
+			inSingleQuotes = !inSingleQuotes
+			current += string(c)
+		case c == '"' && !inSingleQuotes:
+			inDoubleQuotes = !inDoubleQuotes
+			current += string(c)
+		case c == '|' && !inSingleQuotes && !inDoubleQuotes:
+			// unquoted pipe – split here
+			if current != "" {
+				result = append(result, current)
+				current = ""
 			}
-
-		case curChar == ' ' && !inSingleQuotes && !inDoubleQuotes:
-			// If we encounter a space and not in quotes, finalize the current word
-			// Split current by >, >>, <, << and add the separated parts to the result
-			// fmt.Println("current before redirect split:", current)
-			currentAfterRedirects := splitSingleWordByRedirects(current)
-			// fmt.Println("current after redirect split:", currentAfterRedirects)
-			if len(currentAfterRedirects) > 0 {
-				result = append(result, currentAfterRedirects...)
-			}
-			current = ""
-
 		default:
-			// Otherwise, just add the character to the current word
-			current += string(curChar)
+			current += string(c)
 		}
 	}
-
 	if current != "" {
-		currentAfterRedirects := splitSingleWordByRedirects(current)
-		if len(currentAfterRedirects) > 0 {
-			result = append(result, currentAfterRedirects...)
-		}
+		result = append(result, current)
 	}
 	return result
 }
 
-func GetCommand(input string) *types.Command {
+// The first token (command) retains all quotes/escapes; subsequent tokens are stripped and unescaped before redirect splitting.
+func splitByQuotesAndRedirects(input string) []string {
+	input = strings.TrimLeftFunc(input, unicode.IsSpace)
+	var (
+		result         []string
+		current        string
+		inSingleQuotes bool
+		inDoubleQuotes bool
+		escaped        bool
+		firstDone      bool
+	)
+	runes := []rune(input)
+	for i, r := range runes {
+
+		// fmt.Printf("Processing rune: %c (index %d)\n", r, i) // Debugging output
+		switch {
+		case escaped:
+			// fmt.Printf("Escaped character: ~%c~\n", r) // Debugging output
+			current += string(r)
+			escaped = false
+		case r == '\\' && !inSingleQuotes:
+			if !inDoubleQuotes {
+				escaped = true
+				if !firstDone {
+					current += string(r) // keep escape character in first token
+				}
+			} else {
+				if i+1 < len(input) && (input[i+1] == ' ' ||
+					input[i+1] == '\t' ||
+					input[i+1] == '|' ||
+					input[i+1] == '<' ||
+					input[i+1] == '>' ||
+					input[i+1] == '\\' ||
+					(!inDoubleQuotes && input[i+1] == '\'') ||
+					input[i+1] == '"' ||
+					input[i+1] == '\n') {
+					escaped = true
+					if !firstDone {
+						current += string(r)
+					}
+				} else {
+					current += string(r)
+				}
+			}
+		case r == '\'' && !inDoubleQuotes:
+			inSingleQuotes = !inSingleQuotes
+			if !firstDone {
+				current += string(r) // keep escape character in first token
+			}
+		case r == '"' && !inSingleQuotes:
+			inDoubleQuotes = !inDoubleQuotes
+			if !firstDone {
+				current += string(r) // keep escape character in first token
+			}
+		case unicode.IsSpace(r) && !inSingleQuotes && !inDoubleQuotes:
+			if current != "" {
+				if !firstDone {
+					// first token: keep quotes
+					result = append(result, current)
+					firstDone = true
+				} else {
+					// strip surrounding quotes for subsequent tokens
+					stripped := StripSurroundingQuotes(current)
+					result = append(result, splitSingleWordByRedirects(stripped)...)
+				}
+			}
+			current = ""
+		default:
+			current += string(r)
+		}
+		// flush at end
+		if i == len(runes)-1 && current != "" {
+			if !firstDone {
+				result = append(result, current)
+			} else {
+				stripped := StripSurroundingQuotes(current)
+				result = append(result, splitSingleWordByRedirects(stripped)...)
+			}
+		}
+
+		// fmt.Printf("Current token: ~%s~\n", current) // Debugging output
+	}
+	return result
+}
+
+// stripSurroundingQuotes removes matching single or double quotes around a word.
+func StripSurroundingQuotes(s string) string {
+	if len(s) >= 2 {
+		if (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
+}
+
+func ParseCommand(input string, curInputStream *os.File, curOutputStream *os.File) *types.Command {
 	// Split the input into words
 	words := splitByQuotesAndRedirects(input)
-	// fmt.Println("Words after splitting:", words)
+	// fmt.Printf("RAW  (%d bytes): %s\n", len(input), input)
+	// fmt.Printf("GO-LIT: %#v\n", words)
 
 	// Handle empty input
 	if len(words) == 0 {
@@ -142,11 +223,17 @@ func GetCommand(input string) *types.Command {
 	}
 
 	if outputStream == nil {
-		outputStream = os.Stdout // Default output stream
+		outputStream = curOutputStream // Default output stream
 	}
 	if errorStream == nil {
 		errorStream = os.Stderr // Default error stream
 	}
 
-	return &types.Command{Name: commandName, Args: args, OutputStream: outputStream, ErrorStream: errorStream}
+	return &types.Command{Name: commandName, Args: args, InputStream: curInputStream, OutputStream: outputStream, ErrorStream: errorStream}
+}
+
+// Splits input by Pipe characters
+func GetCommands(input string) []string {
+	commandStrings := splitByPipes(input)
+	return commandStrings
 }

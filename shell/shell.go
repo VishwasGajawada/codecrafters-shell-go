@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/chzyer/readline"
 	builtin "github.com/codecrafters-io/shell-starter-go/builtins" // Import builtin package
@@ -70,7 +71,7 @@ func (s *Shell) Run() {
 		}
 
 		// Process the command
-		exitShell := s.processCommand(commandInput)
+		exitShell := s.processInput(commandInput)
 		if exitShell {
 			break
 		}
@@ -82,16 +83,60 @@ func (s *Shell) printPrompt() {
 	fmt.Fprint(os.Stdout, "$ ")
 }
 
+func (s *Shell) processInput(input string) bool {
+	commandStrings := parser.GetCommands(input)
+	// fmt.Fprintf(os.Stdout, "commandStrings: %v\n", commandStrings) // Debugging output
+
+	inputStreams := make([]*os.File, len(commandStrings))
+	outputStreams := make([]*os.File, len(commandStrings))
+
+	// Set default input and output streams for each command
+	for i := range commandStrings {
+		inputStreams[i] = os.Stdin
+		outputStreams[i] = os.Stdout
+	}
+
+	// Connect output streams of previous commands to input streams of next commands
+	for i := 0; i < len(commandStrings)-1; i++ {
+		pipeReader, pipeWriter, err := os.Pipe()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating pipe: %v\n", err)
+			return false // Continue the shell, but log the error
+		}
+		inputStreams[i+1] = pipeReader // Set the next command's input to the pipe reader
+		outputStreams[i] = pipeWriter  // Set the current command's output to the pipe writer
+	}
+
+	commands := make([]*types.Command, len(commandStrings))
+	for i, cmdStr := range commandStrings {
+		commands[i] = parser.ParseCommand(cmdStr, inputStreams[i], outputStreams[i])
+	}
+
+	var wgExecute sync.WaitGroup
+	exitCodes := make([]bool, len(commands))
+	for idx, cmd := range commands {
+		wgExecute.Add(1)
+		go func(cmd *types.Command) {
+			defer wgExecute.Done()
+			exitCodes[idx] = s.processCommand(cmd)
+		}(cmd)
+	}
+	wgExecute.Wait() // Wait for all commands to finish executing
+
+	return exitCodes[len(exitCodes)-1] // Return the exit code of the last command
+}
+
 // processCommand parses and executes a command. Returns true if the shell should exit.
-func (s *Shell) processCommand(input string) bool {
-	// Parse the command input using the parser package
-	cmd := parser.GetCommand(input)
+func (s *Shell) processCommand(cmd *types.Command) bool {
 	if cmd == nil { // Handle cases where parser returns nil (e.g., only redirects or empty)
 		return false
 	}
 
 	defer func() {
 		// Close redirected files if they were opened
+		if cmd.InputStream != os.Stdin {
+			cmd.InputStream.Close()
+		}
 		if cmd.OutputStream != os.Stdout && cmd.OutputStream != os.Stderr {
 			cmd.OutputStream.Close()
 		}
@@ -120,15 +165,20 @@ func (s *Shell) processCommand(input string) bool {
 
 // executeExternalCommand finds and runs an external command.
 func (s *Shell) executeExternalCommand(cmd *types.Command) {
-	_, found := s.pathFinder.FindExecutablePath(cmd.Name)
+	strippedCommand := parser.StripSurroundingQuotes(cmd.Name) // Strip quotes for command name
+	path, found := s.pathFinder.FindExecutablePath(strippedCommand)
 	if !found {
 		fmt.Fprintf(cmd.ErrorStream, "%s: command not found\n", cmd.Name)
 		return
 	}
 
-	execCmd := exec.Command(cmd.Name, cmd.Args...)
+	commandToRun := cmd.Name
+	if strippedCommand != cmd.Name {
+		commandToRun = path // Use the full path if command was quoted
+	}
+	execCmd := exec.Command(commandToRun, cmd.Args...)
 	execCmd.Stdout = cmd.OutputStream
 	execCmd.Stderr = cmd.ErrorStream
-	execCmd.Stdin = os.Stdin // External commands should inherit stdin by default
+	execCmd.Stdin = cmd.InputStream
 	execCmd.Run()
 }
