@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"strconv"
+
 	"github.com/codecrafters-io/shell-starter-go/fsutil"
 	"github.com/codecrafters-io/shell-starter-go/types" // Import the new types package
 )
@@ -67,5 +69,25 @@ func HandleCd(command *types.Command, pathFinder *fsutil.Finder) { // Parameter 
 		}
 	} else {
 		fmt.Fprintf(command.ErrorStream, "cd: %s: No such file or directory\n", targetPath)
+	}
+}
+
+func HandleHistory(command *types.Command, history []string) {
+	if len(history) == 0 {
+		fmt.Fprintln(command.OutputStream, "No commands in history.")
+		return
+	}
+	limit := len(history)
+	if len(command.Args) > 0 {
+		if n, err := strconv.Atoi(command.Args[0]); err == nil {
+			limit = min(limit, n)
+		} else if err != nil {
+			fmt.Fprintf(command.ErrorStream, "history: invalid number: %s\n", command.Args[0])
+			return
+		}
+	}
+
+	for i, cmd := range history[len(history)-limit:] {
+		fmt.Fprintf(command.OutputStream, "\t%d %s\n", len(history)-limit+i+1, cmd)
 	}
 }

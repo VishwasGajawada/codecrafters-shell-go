@@ -18,19 +18,20 @@ import (
 
 // Shell encapsulates the state and behavior of the shell.
 type Shell struct {
-	builtIns   []string
-	pathFinder *fsutil.Finder // Use a struct for path management
-	rl         *readline.Instance
+	builtIns        []string
+	pathFinder      *fsutil.Finder // Use a struct for path management
+	rl              *readline.Instance
+	commandsHistory []string // Store command history for history builtin
 }
 
 // NewShell creates and initializes a new Shell instance.
 func NewShell() *Shell {
-	builtIns := []string{"echo", "type", "exit", "pwd", "cd"}
+	builtIns := []string{"echo", "type", "exit", "pwd", "cd", "history"}
 	pathFinder := fsutil.NewFinder(strings.Split(os.Getenv("PATH"), ":")) // Initialize path finder
 
 	allCommands := make([]string, 0)
 	allCommands = append(allCommands, builtIns...)
-	allCommands = append(allCommands, pathFinder.GetExecutables()...) // Get executables from PATH
+	// allCommands = append(allCommands, pathFinder.GetExecutables()...) // Get executables from PATH
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:          "$ ",
@@ -47,10 +48,24 @@ func NewShell() *Shell {
 		os.Exit(1) // Cannot run interactive shell without readline
 	}
 	return &Shell{
-		builtIns:   builtIns,
-		pathFinder: pathFinder,
-		rl:         rl,
+		builtIns:        builtIns,
+		pathFinder:      pathFinder,
+		rl:              rl,
+		commandsHistory: make([]string, 0), // Initialize command history
 	}
+}
+
+func (s *Shell) ReadInput() (string, error) {
+	// Read a line of input from the user
+	line, err := s.rl.Readline()
+	if err != nil {
+		return "", fmt.Errorf("error reading input: %w", err)
+	}
+	if line != "" {
+		line = strings.TrimSpace(line) // Trim whitespace from the input
+		s.commandsHistory = append(s.commandsHistory, line)
+	}
+	return line, nil
 }
 
 // Run starts the shell's main loop.
@@ -60,9 +75,9 @@ func (s *Shell) Run() {
 	for {
 		s.printPrompt()
 
-		commandInput, err := s.rl.Readline()
+		commandInput, err := s.ReadInput()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading command: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
 			break
 		}
 
@@ -156,6 +171,8 @@ func (s *Shell) processCommand(cmd *types.Command) bool {
 		builtin.HandlePwd(cmd)
 	case "cd":
 		builtin.HandleCd(cmd, s.pathFinder) // Pass the pathFinder instance
+	case "history":
+		builtin.HandleHistory(cmd, s.commandsHistory) // Pass the command history
 	default:
 		// Attempt to execute as an external command
 		s.executeExternalCommand(cmd)
