@@ -31,7 +31,7 @@ func NewShell() *Shell {
 
 	allCommands := make([]string, 0)
 	allCommands = append(allCommands, builtIns...)
-	// allCommands = append(allCommands, pathFinder.GetExecutables()...) // Get executables from PATH
+	allCommands = append(allCommands, pathFinder.GetExecutables()...) // Get executables from PATH
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:          "$ ",
