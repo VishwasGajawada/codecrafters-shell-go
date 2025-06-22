@@ -74,7 +74,7 @@ func (s *Shell) WriteHistoryToFile(command *types.Command, filePath string, appe
 // HISTFILE env variable
 func GetHistoryFromEnv() []string {
 	historyFilePath := os.Getenv("HISTFILE")
-	fmt.Printf("HISTFILE: %s\n", historyFilePath) // Debugging output
+	// fmt.Printf("HISTFILE: %s\n", historyFilePath) // Debugging output
 	if historyFilePath == "" {
 		return make([]string, 0)
 	}
@@ -84,7 +84,7 @@ func GetHistoryFromEnv() []string {
 	}
 
 	history, err := GetHistoryFromFile(historyFilePath)
-	fmt.Printf("Found number of history entries: %d\n", len(history)) // Debugging output
+	// fmt.Printf("Found number of history entries: %d\n", len(history)) // Debugging output
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "history: %v\n", err)
 		return make([]string, 0)
