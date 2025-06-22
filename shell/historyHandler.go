@@ -111,5 +111,5 @@ func (s *Shell) WriteHistoryToEnv() {
 		return
 	}
 
-	s.WriteHistoryToFile(&types.Command{OutputStream: os.Stdout, ErrorStream: os.Stderr}, historyFilePath, true, 0)
+	s.WriteHistoryToFile(&types.Command{OutputStream: os.Stdout, ErrorStream: os.Stderr}, historyFilePath, false, -1)
 }
