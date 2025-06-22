@@ -192,15 +192,15 @@ func (s *Shell) handleHistory(command *types.Command) {
 				s.LoadHistoryFromFile(command, command.Args[i+1])
 			} else {
 				fmt.Fprintln(command.ErrorStream, "history: missing file path after -r")
-				return
 			}
+			return
 		} else if arg == "-w" || arg == "-a" {
 			if i+1 < len(command.Args) {
 				s.WriteHistoryToFile(command, command.Args[i+1], arg == "-a")
 			} else {
 				fmt.Fprintln(command.ErrorStream, "history: missing file path after -w or -a")
-				return
 			}
+			return
 		}
 	}
 
