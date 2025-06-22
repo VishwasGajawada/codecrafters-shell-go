@@ -17,10 +17,14 @@ func NewFinder(paths []string) *Finder {
 	return &Finder{paths: paths}
 }
 
-// IsValidPath checks if a given full path exists and is accessible.
-func (f *Finder) IsValidPath(fullPath string) bool {
+func IsValidPath(fullPath string) bool {
 	_, err := os.Stat(fullPath)
 	return err == nil
+}
+
+// IsValidPath checks if a given full path exists and is accessible.
+func (f *Finder) IsValidPath(fullPath string) bool {
+	return IsValidPath(fullPath)
 }
 
 // GetAbsolutePath converts a relative or special path to an absolute path.

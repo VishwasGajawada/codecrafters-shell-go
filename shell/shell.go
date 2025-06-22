@@ -21,7 +21,7 @@ type Shell struct {
 	builtIns        []string
 	pathFinder      *fsutil.Finder // Use a struct for path management
 	rl              *readline.Instance
-	commandsHistory []string // Store command history for history builtin
+	CommandsHistory []string // Store command history for history builtin
 }
 
 // NewShell creates and initializes a new Shell instance.
@@ -51,7 +51,7 @@ func NewShell() *Shell {
 		builtIns:        builtIns,
 		pathFinder:      pathFinder,
 		rl:              rl,
-		commandsHistory: make([]string, 0), // Initialize command history
+		CommandsHistory: GetHistoryFromEnv(), // Initialize command history
 	}
 }
 
@@ -63,14 +63,15 @@ func (s *Shell) ReadInput() (string, error) {
 	}
 	if line != "" {
 		line = strings.TrimSpace(line) // Trim whitespace from the input
-		s.commandsHistory = append(s.commandsHistory, line)
+		s.CommandsHistory = append(s.CommandsHistory, line)
 	}
 	return line, nil
 }
 
 // Run starts the shell's main loop.
 func (s *Shell) Run() {
-	defer s.rl.Close() // Ensure readline is closed when done
+	defer s.rl.Close()          // Ensure readline is closed when done
+	defer s.WriteHistoryToEnv() // Write command history to environment on exit
 
 	for {
 		s.printPrompt()
@@ -172,12 +173,38 @@ func (s *Shell) processCommand(cmd *types.Command) bool {
 	case "cd":
 		builtin.HandleCd(cmd, s.pathFinder) // Pass the pathFinder instance
 	case "history":
-		builtin.HandleHistory(cmd, s.commandsHistory) // Pass the command history
+		s.handleHistory(cmd) // Pass the command history
 	default:
 		// Attempt to execute as an external command
 		s.executeExternalCommand(cmd)
 	}
 	return false // Continue the shell
+}
+
+func (s *Shell) GetCommandsHistory() []string {
+	return s.CommandsHistory
+}
+
+func (s *Shell) handleHistory(command *types.Command) {
+	for i, arg := range command.Args {
+		if arg == "-r" {
+			if i+1 < len(command.Args) {
+				s.LoadHistoryFromFile(command, command.Args[i+1])
+			} else {
+				fmt.Fprintln(command.ErrorStream, "history: missing file path after -r")
+				return
+			}
+		} else if arg == "-w" || arg == "-a" {
+			if i+1 < len(command.Args) {
+				s.WriteHistoryToFile(command, command.Args[i+1], arg == "-a")
+			} else {
+				fmt.Fprintln(command.ErrorStream, "history: missing file path after -w or -a")
+				return
+			}
+		}
+	}
+
+	builtin.HandleHistory(command, s.CommandsHistory)
 }
 
 // executeExternalCommand finds and runs an external command.

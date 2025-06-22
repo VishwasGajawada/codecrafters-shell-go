@@ -4,9 +4,8 @@ package builtin
 import (
 	"fmt"
 	"os"
-	"strings"
-
 	"strconv"
+	"strings"
 
 	"github.com/codecrafters-io/shell-starter-go/fsutil"
 	"github.com/codecrafters-io/shell-starter-go/types" // Import the new types package
@@ -73,10 +72,6 @@ func HandleCd(command *types.Command, pathFinder *fsutil.Finder) { // Parameter 
 }
 
 func HandleHistory(command *types.Command, history []string) {
-	if len(history) == 0 {
-		fmt.Fprintln(command.OutputStream, "No commands in history.")
-		return
-	}
 	limit := len(history)
 	if len(command.Args) > 0 {
 		if n, err := strconv.Atoi(command.Args[0]); err == nil {
