@@ -47,7 +47,19 @@ func (s *Shell) LoadHistoryFromFile(command *types.Command, historyFilePath stri
 	s.CommandsHistory = append(s.CommandsHistory, historyLoaded...)
 }
 
-func (s *Shell) WriteHistoryToFile(command *types.Command, filePath string, append bool) {
+func writeHistoryToFile(command *types.Command, history []string, file *os.File) {
+	for _, cmd := range history {
+		if cmd != "" {
+			_, err := fmt.Fprintln(file, cmd)
+			if err != nil {
+				fmt.Fprintf(command.ErrorStream, "history: error writing to file %s: %v\n", file.Name(), err)
+				return
+			}
+		}
+	}
+}
+
+func (s *Shell) WriteHistoryToFile(command *types.Command, filePath string, append bool, appendStartLine int) {
 	fileOpenBitMask := os.O_CREATE | os.O_WRONLY
 	if append {
 		fileOpenBitMask |= os.O_APPEND
@@ -60,14 +72,11 @@ func (s *Shell) WriteHistoryToFile(command *types.Command, filePath string, appe
 	}
 	defer file.Close()
 
-	for _, cmd := range s.CommandsHistory {
-		if cmd != "" {
-			_, err := fmt.Fprintln(file, cmd)
-			if err != nil {
-				fmt.Fprintf(command.ErrorStream, "history: error writing to file %s: %v\n", filePath, err)
-				return
-			}
-		}
+	if !append {
+		writeHistoryToFile(command, s.CommandsHistory, file)
+	} else {
+		writeHistoryToFile(command, s.CommandsHistory[appendStartLine:], file)
+		s.lastAppendTillHistory = len(s.CommandsHistory) - 1
 	}
 }
 
@@ -102,5 +111,5 @@ func (s *Shell) WriteHistoryToEnv() {
 		return
 	}
 
-	s.WriteHistoryToFile(&types.Command{OutputStream: os.Stdout, ErrorStream: os.Stderr}, historyFilePath, true)
+	s.WriteHistoryToFile(&types.Command{OutputStream: os.Stdout, ErrorStream: os.Stderr}, historyFilePath, true, 0)
 }

@@ -18,10 +18,11 @@ import (
 
 // Shell encapsulates the state and behavior of the shell.
 type Shell struct {
-	builtIns        []string
-	pathFinder      *fsutil.Finder // Use a struct for path management
-	rl              *readline.Instance
-	CommandsHistory []string // Store command history for history builtin
+	builtIns              []string
+	pathFinder            *fsutil.Finder // Use a struct for path management
+	rl                    *readline.Instance
+	CommandsHistory       []string // Store command history for history builtin
+	lastAppendTillHistory int      // Track the last appended index for history
 }
 
 // NewShell creates and initializes a new Shell instance.
@@ -48,10 +49,11 @@ func NewShell() *Shell {
 		os.Exit(1) // Cannot run interactive shell without readline
 	}
 	return &Shell{
-		builtIns:        builtIns,
-		pathFinder:      pathFinder,
-		rl:              rl,
-		CommandsHistory: GetHistoryFromEnv(), // Initialize command history
+		builtIns:              builtIns,
+		pathFinder:            pathFinder,
+		rl:                    rl,
+		CommandsHistory:       GetHistoryFromEnv(), // Initialize command history
+		lastAppendTillHistory: -1,                  // Initialize last appended index for history
 	}
 }
 
@@ -196,7 +198,7 @@ func (s *Shell) handleHistory(command *types.Command) {
 			return
 		} else if arg == "-w" || arg == "-a" {
 			if i+1 < len(command.Args) {
-				s.WriteHistoryToFile(command, command.Args[i+1], arg == "-a")
+				s.WriteHistoryToFile(command, command.Args[i+1], arg == "-a", s.lastAppendTillHistory+1)
 			} else {
 				fmt.Fprintln(command.ErrorStream, "history: missing file path after -w or -a")
 			}
